@@ -17,4 +17,7 @@ int prodConsS();
 
 int phil();
 
+
+int PC100();
+
 #endif //OS_EXCERCISES_H

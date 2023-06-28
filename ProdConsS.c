@@ -1,4 +1,7 @@
-
+//Si implementi il classico problema produttori/consumatori con le seguenti modifiche:
+//- esiste la classe dei consumatori "speciali" che consumano due elementi anziché uno.
+//- se un consumatore speciale va in waiting
+// allora da questo momento in poi al massimo 5 consumatori normali potranno consumare prima che almeno un consumatore speciale venga risvegliato.
 #include <semaphore.h>
 #include <stdlib.h>
 #include <time.h>
@@ -11,7 +14,7 @@
 int buff[BUF_S];
 sem_t pro, con, ful, empt, prod_num, pr_special;
 pthread_t pr, co;
-int prod_number;
+int prod_number = 0, numCons = -1;
 
 _Noreturn void *pr0d(void *args) {
     int index = 0;
@@ -22,14 +25,17 @@ _Noreturn void *pr0d(void *args) {
 
         buff[index] = val;
         printf("Productor wrote %d at %d\n", val, index);
-        sem_wait(prod_num);
-        prod_number += 1;
-        sem_post(prod_num);
         index = (index + 1) % BUF_S;
 
         sem_post(pro);
         sem_post(ful);
-
+        sem_wait(prod_num);
+        prod_number += 1;
+        if (numCons >= 5 && prod_number >= 2) {
+            sem_post(prod_num);
+            sem_post(pr_special);
+        }
+        sem_post(prod_num);
     }
 }
 
@@ -43,8 +49,14 @@ _Noreturn void *c0ns(void *args) {
         val = buff[index];
         index = (index + 1) % BUF_S;
         printf("Consumer read %d at %d\n", val, index);
-        sem_post(pro);
+        sem_post(con);
         sem_post(empt);
+        sem_wait(prod_num);
+        prod_number--;
+        if (numCons != -1) {
+            numCons++;
+            sem_post(prod_num);
+        }
     }
 }
 
@@ -53,6 +65,8 @@ _Noreturn void *c0ns_special(void *args) {
     while (true) {
         sem_wait(prod_num);
         if (prod_number < 2) {
+            numCons = 0;
+            sem_post(prod_num);
             sem_wait(pr_special);
         }
         int val;
@@ -61,9 +75,14 @@ _Noreturn void *c0ns_special(void *args) {
         val = buff[index];
         index = (index + 1) % BUF_S;
         printf("Consumer read %d at %d\n", val, index);
-        sem_post(pro);
+        sem_post(con);
         sem_post(empt);
         sem_post(empt);
+        sem_wait(prod_num);
+        prod_number -= 2;
+        numCons = -1;
+        sem_post(prod_num);
+
     }
 }
 
